@@ -4,7 +4,8 @@ ENV RESTY_VERSION="1.15.8.1"
 ENV RESTY_OPENSSL_VERSION="1.0.2p"
 ENV RESTY_PCRE_VERSION="8.42"
 ENV NGINX_UPLOAD_VERSION="2.3.0"
-ENV RESTY_J="2"
+ENV NGINX_RTMP_VERSION="1.2.1"
+ENV RESTY_J="5"
 ENV RESTY_CONFIG_OPTIONS="\
   --prefix=/opt/openresty \
   --sbin-path=/opt/openresty/sbin/nginx \
@@ -38,7 +39,8 @@ ENV RESTY_CONFIG_OPTIONS="\
   --with-http_image_filter_module \
   --with-pcre-jit \
   --with-file-aio \
-  --add-module=/opt/nginx-upload-module-${NGINX_UPLOAD_VERSION}"
+  --add-module=/opt/nginx-upload-module-${NGINX_UPLOAD_VERSION} \
+  --add-module=/opt/nginx-rtmp-module-${NGINX_RTMP_VERSION}"
 ENV RESTY_CONFIG_OPTIONS_MORE=""
 ENV RESTY_ADD_PACKAGE_BUILDDEPS=""
 ENV RESTY_ADD_PACKAGE_RUNDEPS=""
@@ -64,7 +66,7 @@ ADD 0001.patch /opt/0001.patch
 
 # 1) Install apk dependencies
 # 2) Download and untar OpenSSL, PCRE, and OpenResty
-# 3) Download and unzip nginx_upload_module
+# 3) Download and unzip nginx_upload_module and nginx_rtmp_module
 # 4) Build OpenResty
 # 5) Cleanup
 
@@ -83,6 +85,7 @@ RUN apk add --no-cache --virtual .build-deps \
         ${RESTY_ADD_PACKAGE_BUILDDEPS} \
     && apk add --no-cache \
         gd \
+        ffmpeg \
         geoip \
         libgcc \
         libxslt \
@@ -105,9 +108,11 @@ RUN apk add --no-cache --virtual .build-deps \
     && tar xzf openresty.tar.gz -C /opt/openresty --strip-components 1 \
     && curl -fSL https://github.com/fdintino/nginx-upload-module/archive/${NGINX_UPLOAD_VERSION}.zip -o upload.zip \
     && unzip upload.zip \
+    && curl -fSL https://github.com/arut/nginx-rtmp-module/archive/v${NGINX_RTMP_VERSION}.zip -o rtmp.zip \
+    && unzip rtmp.zip \
     && rm -rf openssl-${RESTY_OPENSSL_VERSION}.tar.gz \
         openresty-${RESTY_VERSION}.tar.gz openresty.tar.gz \
-        pcre-${RESTY_PCRE_VERSION}.tar.gz upload.zip \
+        pcre-${RESTY_PCRE_VERSION}.tar.gz upload.zip rtmp.zip \
     && cd /opt/nginx-upload-module-${NGINX_UPLOAD_VERSION} \
     && mv /opt/0001.patch . \
     && git apply -v --ignore-space-change --ignore-whitespace 0001.patch \
@@ -122,6 +127,7 @@ RUN apk add --no-cache --virtual .build-deps \
     && rm -rf openssl-${RESTY_OPENSSL_VERSION} \
         pcre-${RESTY_PCRE_VERSION} \
         nginx-upload-module-${NGINX_UPLOAD_VERSION} \
+        nginx-rtmp-module-${NGINX_RTMP_VERSION} \
     && apk del .build-deps \
     && mkdir -p /opt/openresty/vhosts-extra/tools \
     && mkdir -p /opt/openresty/vhosts \
@@ -135,7 +141,7 @@ ADD conf/etc /opt/openresty/etc
 ADD conf/vhosts /opt/openresty/vhosts
 
 RUN mkdir -p /tmp/state \
-    && mkdir -p /tmp/upload
+    && mkdir -p /tmp/dash
 
 EXPOSE 8080
 
